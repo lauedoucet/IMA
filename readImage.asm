@@ -8,6 +8,8 @@ struct:		.space 1024		# max space = 3 + 255^2
 errorOpen: 	.asciiz "There was an error opening the file."
 		.align 2
 errorRead: 	.asciiz	"There was an error reading the file."
+		.align 2
+errorFormat	.asciiz "Wrong file format. Please use .pgm P5 or P2"
 
 .text
 		.globl read_image
@@ -58,13 +60,16 @@ read_image:
 	# load image info
 	addi $t0, $s1, 0		# set t = num of bytes read
 	la $s2, buffer			# load buffer address
-	lb $t1, ($s2)			# load first byte into t1
-					# first byte is 'P' so we can throwaway
+	lbu $t1, ($s2)			# load first byte into t1
+	subu $t1, $t1, 80		# check first byte is 'P'
+	bnez $t1, error_format		# if not goto error		
+					
 	subu $t0, $t0, 1		# decrement t0
 	addu $s2, $s2, 1		# increment buffer address
-	lb $t1, ($s2)			# load code into t1: 2 or 5
-	
-	# load contents
+	lbu $t1, ($s2)			# load code into t1: 2 or 5
+	subu $t1, $t1, 53		
+	beqz $t1, p5_format		# t1 = '5'
+	bltz $t1, p2_format		# t1 = '2'
 	
 	# load $s registers
 	lw $s2, 8($sp)
@@ -73,6 +78,11 @@ read_image:
 	addu $sp, $sp, 12
 	
 	jr $ra
+	
+p5_format:
+	# get witdh, get height, get maxval
+
+p2_format:
 	
 error_open: 
 	li $v0, 4			# print error message
@@ -87,3 +97,11 @@ error_read:
 	syscall
 	
 	jr $ra 				# exit subroutine
+	
+error_format:
+	li $v0, 4			# print error message
+	la $a0, errorFormat
+	syscall
+	
+	jr $ra 				# exit subroutine
+	
